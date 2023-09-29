@@ -709,6 +709,9 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False)
         isOII = (3724 <= dtemplate.template.wave) & \
             (dtemplate.template.wave <= 3733)
         OIItemplate = dtemplate.template.flux[:,isOII].T
+        isOIII = (4930 <= dtemplate.template.wave) & \
+            (dtemplate.template.wave <= 5035)
+        OIIItemplate = dtemplate.template.flux[:,isOII].T
 
     ## Redshifted templates are now already in format needed - dict of 3d
     # arrays (CUPY or numpy).
