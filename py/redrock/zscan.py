@@ -709,9 +709,15 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False)
         isOII = (3724 <= dtemplate.template.wave) & \
             (dtemplate.template.wave <= 3733)
         OIItemplate = dtemplate.template.flux[:,isOII].T
-        isOIII = (4930 <= dtemplate.template.wave) & \
-            (dtemplate.template.wave <= 5035)
-        OIIItemplate = dtemplate.template.flux[:,isOII].T
+        isOIIcontl = (3724 <= dtemplate.template.wave) & \
+            (dtemplate.template.wave <= 3733)
+        OIItemplatecontl = dtemplate.template.flux[:,isOII].T
+        isOIIcontr = (3724 <= dtemplate.template.wave) & \
+            (dtemplate.template.wave <= 3733)
+        OIItemplatecontr = dtemplate.template.flux[:,isOII].T
+        # isOIII = (4930 <= dtemplate.template.wave) & \
+        #     (dtemplate.template.wave <= 5035)
+        # OIIItemplate = dtemplate.template.flux[:,isOIII].T
 
     ## Redshifted templates are now already in format needed - dict of 3d
     # arrays (CUPY or numpy).
@@ -746,12 +752,30 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False)
         #- Penalize chi2 for negative [OII] flux; ad-hoc
         if dtemplate.template.template_type == 'GALAXY':
             OIIflux = np.sum(zcoeff[j] @ OIItemplate.T, axis=1)
-            zchi2penalty[j][OIIflux < 0] = -OIIflux[OIIflux < 0]
+            print(OIIflux.shape)
+            OIImodel=zcoeff[j] @ OIItemplate.T #?
+            OIImodelcontl=zcoeff[j] @ OIItemplatecontl.T
+            OIImodelcontr=zcoeff[j] @ OIItemplatecontr.T
+            OIIdata=flux[:,isOII]
+            OIIdatacontl=flux[:,isOIIcontl]
+            OIIdatacontr=flux[:,isOIIcontr]
+            OIIsig=weights[:,isOII]
+            datcont=np.nanmedian(np.concatenate([OIIdatacontl,OIIdatacontr]))
+            #finding the model continuum average
+            modcont=np.nanmedian(np.concatenate([OIImodelcontl,OIImodelcontr]))
+            csd=OIIdata-datcont
+            csm=OIImodel-modcont
+            # zchi2penalty[j][OIIflux < 0] = -OIIflux[OIIflux < 0]
+            binpen=csm[(csm<0)]*(2*csd[(csm<0)]-csm[(csm<0)])*OIIsig[(csm<0)]
+            binpen[binpen<0]=0
+            print(binpen.shape)
+            zchi2penalty[j]=np.nansum(binpen)
+            penarm.append(np.nansum(binpen[binpen>0]))
 
         if dtemplate.comm is None and progress is not None:
             progress.put(1)
 
-    return zchi2, zcoeff, zchi2penalty
+    return z      , zcoeff, zchi2penalty
 
 
 def _mp_calc_zchi2(indx, target_ids, target_data, t, use_gpu, qout, qprog):
