@@ -463,7 +463,7 @@ def rrboss(options=None, comm=None):
         dtargets = DistTargetsCopy(targets, comm=comm, root=0)
 
         # Get the dictionary of wavelength grids
-        dwave = dtargets.wavegrids()
+        dwave = degrtargets.wavids()
 
         stop = elapsed(start, "Distribution of {} targets"\
             .format(len(dtargets.all_target_ids)), comm=comm)

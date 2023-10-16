@@ -756,10 +756,10 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False)
             OIImodel=zcoeff[j] @ OIItemplate.T #?
             OIImodelcontl=zcoeff[j] @ OIItemplatecontl.T
             OIImodelcontr=zcoeff[j] @ OIItemplatecontr.T
-            OIIdata=flux[:,isOII]
-            OIIdatacontl=flux[:,isOIIcontl]
-            OIIdatacontr=flux[:,isOIIcontr]
-            OIIsig=weights[:,isOII]
+            OIIdata=flux[isOII]
+            OIIdatacontl=flux[isOIIcontl]
+            OIIdatacontr=flux[isOIIcontr]
+            OIIsig=weights[isOII]
             datcont=np.nanmedian(np.concatenate([OIIdatacontl,OIIdatacontr]))
             #finding the model continuum average
             modcont=np.nanmedian(np.concatenate([OIImodelcontl,OIImodelcontr]))
