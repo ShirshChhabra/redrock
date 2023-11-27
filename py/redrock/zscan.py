@@ -661,7 +661,7 @@ def calc_zchi2_batch(spectra, tdata, weights, flux, wflux, nz, nbasis, solve_mat
             if new_penalty:
                 wavegrid = np.concatenate([ s.wave for s in spectra ])
                 # print(np.shape(wavegrid))
-                penlin=[]
+                penlin=0
                 for linetype in ['OIII_right','OIII_left','OII']:
                     if linetype=='OIII_right':
                         linemin=5000
@@ -693,9 +693,9 @@ def calc_zchi2_batch(spectra, tdata, weights, flux, wflux, nz, nbasis, solve_mat
                     csm=linmodel-contmodel
                     penpix=csm[(csm<0)]*(2*csd[(csm<0)]-csm[(csm<0)])*linweight[(csm<0)]
                     pen=np.sum(penpix[penpix>0])
-                    penlin.append(pen)
+                    penlin+=pen
 
-                zpen[i]=np.sum(penlin)
+                zpen[i]=penlin
                           
         
     return (zchi2, zcoeff,zpen) if new_penalty else (zchi2, zcoeff)
