@@ -511,7 +511,7 @@ def calc_batch_dot_product_3d3d_gpu(a, b, transpose_a=False, fullprecision=True)
 ###    templates are looped over on the CPU.  The operations performed
 ###    are very obviously analagous though and should be highly
 ###    maintainable.  The main difference is the extra loop on the CPU version
-def calc_zchi2_batch(spectra, tdata, weights, flux, wflux, nz, nbasis, solve_matrices_algorithm="PCA", use_gpu=False, fullprecision=True):
+def calc_zchi2_batch(spectra, tdata, weights, flux, wflux, nz, nbasis, solve_matrices_algorithm="PCA", use_gpu=False, fullprecision=True, new_penalty=False):
     """Calculate a batch of chi2.
     For many redshifts and a set of spectral data, compute the chi2 for
     template data that is already on the correct grid.
@@ -535,6 +535,7 @@ def calc_zchi2_batch(spectra, tdata, weights, flux, wflux, nz, nbasis, solve_mat
 
     """
     zchi2 = np.zeros(nz)
+    zpen=np.zeros(nz)
     if (weights.sum() == 0):
         zchi2[:] = 9e99
         zcoeff = np.zeros((nz, nbasis))
@@ -652,9 +653,52 @@ def calc_zchi2_batch(spectra, tdata, weights, flux, wflux, nz, nbasis, solve_mat
             #4) Calculate dot products individually for each template
             model = Tb.dot(zcoeff[i,:])
 
+
             #5) Calculate this zchi2 element individually for each template
             zchi2[i] = np.dot( (flux - model)**2, weights )
-    return (zchi2, zcoeff)
+
+            #6) Calculate the penalty
+            if new_penalty:
+                wavegrid = np.concatenate([ s.wave for s in spectra ])
+                # print(np.shape(wavegrid))
+                penlin=[]
+                for linetype in ['OIII_right','OIII_left','OII']:
+                    if linetype=='OIII_right':
+                        linemin=5000
+                        cont1min=4980
+                        linemax=5015
+                        cont1max=4990
+                        cont2min=5025
+                        cont2max=5035
+                    elif linetype=='OIII_left':
+                        linemin=4952
+                        linemax=4967
+                        cont1min=4930
+                        cont1max=4940
+                        cont2min=4975
+                        cont2max=4985
+                    elif linetype=='OII':
+                        linemin=3720
+                        linemax=3735
+                        cont1min=3700
+                        cont1max=3710
+                        cont2min=3745
+                        cont2max=3755
+                    linflux=flux[(wavegrid>=linemin)&(wavegrid<=linemax)]
+                    linweight=weights[(wavegrid>=linemin)&(wavegrid<=linemax)]
+                    linmodel=model[(wavegrid>=linemin)&(wavegrid<=linemax)]
+                    contflux=np.median(flux[((wavegrid>=cont1min)&(wavegrid<=cont1max))|((wavegrid>=cont2min)&(wavegrid<=cont2max))])
+                    contmodel=np.median(model[((wavegrid>=cont1min)&(wavegrid<=cont1max))|((wavegrid>=cont2min)&(wavegrid<=cont2max))])
+                    csd=linflux-contflux
+                    csm=linmodel-contmodel
+                    penpix=csm[(csm<0)]*(2*csd[(csm<0)]-csm[(csm<0)])*linweight[(csm<0)]
+                    pen=np.sum(penpix[penpix>0])
+                    penlin.append(pen)
+
+                zpen[i]=np.sum(penlin)
+                          
+        
+    return (zchi2, zcoeff,zpen) if new_penalty else (zchi2, zcoeff)
 
 
 ###!!! NOTE - this is the main method for the v3 algorithm
@@ -662,7 +706,7 @@ def calc_zchi2_batch(spectra, tdata, weights, flux, wflux, nz, nbasis, solve_mat
 ###    templates are looped over on the CPU.  The operations performed
 ###    are very obviously analagous though and should be highly
 ###    maintainable.  The main difference is the extra loop on the CPU version
-def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False):
+def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False, new_penalty=False):
     """Calculate chi2 vs. redshift for a given PCA template.
 
     New CPU/GPU algorithms June 2022
@@ -673,6 +717,7 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False)
         dtemplate (DistTemplate): distributed template data
         progress (multiprocessing.Queue): optional queue for tracking
             progress, only used if MPI is disabled.
+        new_penalty: Boolean variable to test new versions of penalty
 
     Returns:
         tuple: (zchi2, zcoeff, zchi2penalty) with:
@@ -703,21 +748,12 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False)
     zchi2 = np.zeros( (ntargets, nz) )
     zchi2penalty = np.zeros( (ntargets, nz) )
     zcoeff = np.zeros( (ntargets, nz, nbasis) )
-
+    if not new_penalty:
     # Redshifts near [OII]; used only for galaxy templates
-    if dtemplate.template.template_type == 'GALAXY':
-        isOII = (3724 <= dtemplate.template.wave) & \
-            (dtemplate.template.wave <= 3733)
-        OIItemplate = dtemplate.template.flux[:,isOII].T
-        isOIIcontl = (3724 <= dtemplate.template.wave) & \
-            (dtemplate.template.wave <= 3733)
-        OIItemplatecontl = dtemplate.template.flux[:,isOII].T
-        isOIIcontr = (3724 <= dtemplate.template.wave) & \
-            (dtemplate.template.wave <= 3733)
-        OIItemplatecontr = dtemplate.template.flux[:,isOII].T
-        # isOIII = (4930 <= dtemplate.template.wave) & \
-        #     (dtemplate.template.wave <= 5035)
-        # OIIItemplate = dtemplate.template.flux[:,isOIII].T
+        if dtemplate.template.template_type == 'GALAXY':
+            isOII = (3724 <= dtemplate.template.wave) & \
+                (dtemplate.template.wave <= 3733)
+            OIItemplate = dtemplate.template.flux[:,isOII].T
 
     ## Redshifted templates are now already in format needed - dict of 3d
     # arrays (CUPY or numpy).
@@ -747,35 +783,20 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False)
         # for all templates for all three spectra for this target
 
         # For coarse z scan, use fullprecision = False to maximize speed
-        (zchi2[j,:], zcoeff[j,:,:]) = calc_zchi2_batch(target_data[j].spectra, tdata, weights, flux, wflux, nz, nbasis, dtemplate.template.solve_matrices_algorithm, use_gpu, fullprecision=False)
+        if new_penalty:
 
+            (zchi2[j,:], zcoeff[j,:,:],zchi2penalty[j,:]) = calc_zchi2_batch(target_data[j].spectra, tdata, weights, flux, wflux, nz, nbasis, dtemplate.template.solve_matrices_algorithm, use_gpu, fullprecision=False, new_penalty=new_penalty)
+        else:
+            (zchi2[j,:], zcoeff[j,:,:]) = calc_zchi2_batch(target_data[j].spectra, tdata, weights, flux, wflux, nz, nbasis, dtemplate.template.solve_matrices_algorithm, use_gpu, fullprecision=False, new_penalty=new_penalty)
         #- Penalize chi2 for negative [OII] flux; ad-hoc
-        if dtemplate.template.template_type == 'GALAXY':
-            OIIflux = np.sum(zcoeff[j] @ OIItemplate.T, axis=1)
-            print(OIIflux.shape)
-            OIImodel=zcoeff[j] @ OIItemplate.T #?
-            OIImodelcontl=zcoeff[j] @ OIItemplatecontl.T
-            OIImodelcontr=zcoeff[j] @ OIItemplatecontr.T
-            OIIdata=flux[isOII]
-            OIIdatacontl=flux[isOIIcontl]
-            OIIdatacontr=flux[isOIIcontr]
-            OIIsig=weights[isOII]
-            datcont=np.nanmedian(np.concatenate([OIIdatacontl,OIIdatacontr]))
-            #finding the model continuum average
-            modcont=np.nanmedian(np.concatenate([OIImodelcontl,OIImodelcontr]))
-            csd=OIIdata-datcont
-            csm=OIImodel-modcont
-            # zchi2penalty[j][OIIflux < 0] = -OIIflux[OIIflux < 0]
-            binpen=csm[(csm<0)]*(2*csd[(csm<0)]-csm[(csm<0)])*OIIsig[(csm<0)]
-            binpen[binpen<0]=0
-            print(binpen.shape)
-            zchi2penalty[j]=np.nansum(binpen)
-            penarm.append(np.nansum(binpen[binpen>0]))
+            if dtemplate.template.template_type == 'GALAXY':
+                OIIflux = np.sum(zcoeff[j] @ OIItemplate.T, axis=1)
+                zchi2penalty[j][OIIflux < 0] = -OIIflux[OIIflux < 0]
 
         if dtemplate.comm is None and progress is not None:
             progress.put(1)
 
-    return z      , zcoeff, zchi2penalty
+    return zchi2, zcoeff, zchi2penalty
 
 
 def _mp_calc_zchi2(indx, target_ids, target_data, t, use_gpu, qout, qprog):

@@ -107,7 +107,7 @@ def minfit(x, y):
     return (x0, xerr, y0, zwarn)
 
 
-def fitz(zchi2, redshifts, target, template, nminima=3, archetype=None, use_gpu=False):
+def fitz(zchi2, redshifts, target, template, nminima=3, archetype=None, use_gpu=False,new_penalty=False):
     """Refines redshift measurement around up to nminima minima.
 
     TODO:
@@ -121,6 +121,7 @@ def fitz(zchi2, redshifts, target, template, nminima=3, archetype=None, use_gpu=
         template (Template): the template for this fit.
         nminima (int): the number of minima to consider.
         use_gpu (bool): use GPU or not
+        new_penalty (bool): Variable to choose different versions of penalty
 
     Returns:
         Table: the fit parameters for the minima.
@@ -181,6 +182,7 @@ def fitz(zchi2, redshifts, target, template, nminima=3, archetype=None, use_gpu=
 
         zzchi2 = np.zeros(nz, dtype=np.float64)
         zzcoeff = np.zeros((nz, nbasis), dtype=np.float64)
+        zzpen  = np.zeros(nz, dtype=np.float64)
 
         #Calculate xmin and xmax from template and zz array on CPU and
         #pass as scalars
@@ -207,10 +209,19 @@ def fitz(zchi2, redshifts, target, template, nminima=3, archetype=None, use_gpu=
             binned[k] *= T[:,:,None]
         if (use_gpu):
             #Use gpu arrays for weights, flux, wflux
-            (zzchi2, zzcoeff) = calc_zchi2_batch(spectra, binned, gpuweights, gpuflux, gpuwflux, nz, nbasis, use_gpu=use_gpu)
+            (zzchi2, zzcoeff) = calc_zchi2_batch(spectra, binned, gpuweights, gpuflux, gpuwflux, nz, nbasis, use_gpu=use_gpu,new_penalty=False)
         else:
-            #Use numpy CPU arrays for weights, flux, wflux 
-            (zzchi2, zzcoeff) = calc_zchi2_batch(spectra, binned, weights, flux, wflux, nz, nbasis, use_gpu=use_gpu)
+            if new_penalty:
+
+                #Use numpy CPU arrays for weights, flux, wflux 
+                (zzchi2, zzcoeff,zzpen) = calc_zchi2_batch(spectra, binned, weights, flux, wflux, nz, nbasis, use_gpu=use_gpu,new_penalty=True)
+            
+                zzchi2=zzchi2+zzpen
+            else:
+                (zzchi2, zzcoeff) = calc_zchi2_batch(spectra, binned, weights, flux, wflux, nz, nbasis, use_gpu=use_gpu,new_penalty=False)
+            
+
+
 
         #- fit parabola to 3 points around minimum
         i = min(max(np.argmin(zzchi2),1), len(zz)-2)
@@ -239,7 +250,13 @@ def fitz(zchi2, redshifts, target, template, nminima=3, archetype=None, use_gpu=
                 #Vectorize multiplication
                 binned[k] *= T[:,:,None]
             #Use CPU always with one redshift
-            (chi2, coeff) = calc_zchi2_batch(spectra, binned, weights, flux, wflux, 1, nbasis, use_gpu=False)
+            if new_penalty:
+                (chi2, coeff,penalty) = calc_zchi2_batch(spectra, binned, weights, flux, wflux, 1, nbasis, use_gpu=False,new_penalty=True)
+
+                chi2=chi2+penalty
+            else:
+                (chi2, coeff) = calc_zchi2_batch(spectra, binned, weights, flux, wflux, 1, nbasis, use_gpu=False,new_penalty=False)
+  
             coeff = coeff[0,:]
         except ValueError as err:
             if zmin<redshifts[0] or redshifts[-1]<zmin:
