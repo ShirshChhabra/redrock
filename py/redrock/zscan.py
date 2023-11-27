@@ -696,6 +696,7 @@ def calc_zchi2_batch(spectra, tdata, weights, flux, wflux, nz, nbasis, solve_mat
                     penlin+=pen
 
                 zpen[i]=penlin
+                print('new pen is used')
                           
         
     return (zchi2, zcoeff,zpen) if new_penalty else (zchi2, zcoeff)
