@@ -357,7 +357,7 @@ def zfind(targets, templates, mp_procs=1, nminima=3, archetypes=None, priors=Non
                     eff_chi2[i,:] = results[tg.id][ft]['zchi2'] \
                         + results[tg.id][ft]['penalty']
                 p = mp.Process(target=_mp_fitz, args=(eff_chi2,
-                    target_data, t, nminima, qout, archetype, use_gpu,new_penalty=new_penalty))
+                    target_data, t, nminima, qout, archetype, use_gpu,new_penalty))
                 procs.append(p)
                 p.start()
 
