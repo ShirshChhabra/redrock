@@ -613,6 +613,9 @@ def rrdesi(options=None, comm=None):
 
     parser.add_argument("--max-gpuprocs", type=int, default=None,
         required=False, help="limit number of MPI processes using GPUs")
+    
+    parser.add_argument("--new-penalty", action="store_true", default=False,
+        required=False, help="Set to use new penalty")
 
     args = None
     if options is None:
@@ -822,7 +825,7 @@ def rrdesi(options=None, comm=None):
 
         scandata, zfit = zfind(targets, dtemplates, mpprocs,
             nminima=args.nminima, archetypes=args.archetypes,
-            priors=args.priors, chi2_scan=args.chi2_scan, use_gpu=use_gpu)
+            priors=args.priors, chi2_scan=args.chi2_scan, use_gpu=use_gpu,new_penalty=args.new_penalty)
 
         stop = elapsed(start, "Computing redshifts", comm=comm)
 
