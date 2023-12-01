@@ -786,6 +786,7 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False,
         # For coarse z scan, use fullprecision = False to maximize speed
         if new_penalty:
             (zchi2[j,:], zcoeff[j,:,:],zchi2penalty[j,:]) = calc_zchi2_batch(target_data[j].spectra, tdata, weights, flux, wflux, nz, nbasis, dtemplate.template.solve_matrices_algorithm, use_gpu, fullprecision=False, new_penalty=new_penalty)
+            print('new pen is used')
         else:
             (zchi2[j,:], zcoeff[j,:,:]) = calc_zchi2_batch(target_data[j].spectra, tdata, weights, flux, wflux, nz, nbasis, dtemplate.template.solve_matrices_algorithm, use_gpu, fullprecision=False, new_penalty=new_penalty)
             if dtemplate.template.template_type == 'GALAXY':
