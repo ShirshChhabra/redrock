@@ -696,7 +696,7 @@ def calc_zchi2_batch(spectra, tdata, weights, flux, wflux, nz, nbasis, solve_mat
                     penlin+=pen
 
                 zpen[i]=penlin
-                print('new pen is used',penlin)
+                # print('new pen is used',penlin)
                           
         
     return (zchi2, zcoeff,zpen) if new_penalty else (zchi2, zcoeff)
@@ -785,13 +785,13 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False,
 
         # For coarse z scan, use fullprecision = False to maximize speed
         if new_penalty:
-
             (zchi2[j,:], zcoeff[j,:,:],zchi2penalty[j,:]) = calc_zchi2_batch(target_data[j].spectra, tdata, weights, flux, wflux, nz, nbasis, dtemplate.template.solve_matrices_algorithm, use_gpu, fullprecision=False, new_penalty=new_penalty)
         else:
             (zchi2[j,:], zcoeff[j,:,:]) = calc_zchi2_batch(target_data[j].spectra, tdata, weights, flux, wflux, nz, nbasis, dtemplate.template.solve_matrices_algorithm, use_gpu, fullprecision=False, new_penalty=new_penalty)
             if dtemplate.template.template_type == 'GALAXY':
                 OIIflux = np.sum(zcoeff[j] @ OIItemplate.T, axis=1)
                 zchi2penalty[j][OIIflux < 0] = 100
+                print('old pen is used')
 
         if dtemplate.comm is None and progress is not None:
             progress.put(1)
