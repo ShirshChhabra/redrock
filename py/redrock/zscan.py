@@ -784,12 +784,11 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False,
         # for all templates for all three spectra for this target
 
         # For coarse z scan, use fullprecision = False to maximize speed
-        if new_penalty:
+        if new_penalty==True:
 
             (zchi2[j,:], zcoeff[j,:,:],zchi2penalty[j,:]) = calc_zchi2_batch(target_data[j].spectra, tdata, weights, flux, wflux, nz, nbasis, dtemplate.template.solve_matrices_algorithm, use_gpu, fullprecision=False, new_penalty=new_penalty)
         else:
             (zchi2[j,:], zcoeff[j,:,:]) = calc_zchi2_batch(target_data[j].spectra, tdata, weights, flux, wflux, nz, nbasis, dtemplate.template.solve_matrices_algorithm, use_gpu, fullprecision=False, new_penalty=new_penalty)
-        #- Penalize chi2 for negative [OII] flux; ad-hoc
             if dtemplate.template.template_type == 'GALAXY':
                 OIIflux = np.sum(zcoeff[j] @ OIItemplate.T, axis=1)
                 zchi2penalty[j][OIIflux < 0] = 0
