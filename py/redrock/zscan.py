@@ -792,7 +792,7 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False,
         #- Penalize chi2 for negative [OII] flux; ad-hoc
             if dtemplate.template.template_type == 'GALAXY':
                 OIIflux = np.sum(zcoeff[j] @ OIItemplate.T, axis=1)
-                zchi2penalty[j][OIIflux < 0] = -OIIflux[OIIflux < 0]
+                zchi2penalty[j][OIIflux < 0] = 0
 
         if dtemplate.comm is None and progress is not None:
             progress.put(1)
