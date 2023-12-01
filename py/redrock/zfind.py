@@ -271,7 +271,7 @@ def zfind(targets, templates, mp_procs=1, nminima=3, archetypes=None, priors=Non
     # Compute the coarse-binned chi2 for all local targets.
     start_zscan = elapsed(None, "", comm=targets.comm)
     if chi2_scan is None:
-        results = calc_zchi2_targets(targets, templates, mp_procs=mp_procs, use_gpu=use_gpu)
+        results = calc_zchi2_targets(targets, templates, mp_procs=mp_procs, use_gpu=use_gpu,new_penalty=new_penalty)
     else:
         results = read_zscan_redrock(chi2_scan)
     elapsed(start_zscan, "Scanning redshifts", comm=targets.comm)

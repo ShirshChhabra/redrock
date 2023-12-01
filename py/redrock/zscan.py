@@ -800,7 +800,7 @@ def calc_zchi2(target_ids, target_data, dtemplate, progress=None, use_gpu=False,
     return zchi2, zcoeff, zchi2penalty
 
 
-def _mp_calc_zchi2(indx, target_ids, target_data, t, use_gpu, qout, qprog):
+def _mp_calc_zchi2(indx, target_ids, target_data, t, use_gpu, qout, qprog,new_penalty):
     """Wrapper for multiprocessing version of calc_zchi2.
     """
     try:
@@ -808,7 +808,7 @@ def _mp_calc_zchi2(indx, target_ids, target_data, t, use_gpu, qout, qprog):
         for tg in target_data:
             tg.sharedmem_unpack()
         tzchi2, tzcoeff, tpenalty = calc_zchi2(target_ids, target_data, t,
-            use_gpu=use_gpu, progress=qprog)
+            use_gpu=use_gpu, progress=qprog,new_penalty=new_penalty)
         qout.put( (indx, tzchi2, tzcoeff, tpenalty) )
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -818,7 +818,7 @@ def _mp_calc_zchi2(indx, target_ids, target_data, t, use_gpu, qout, qprog):
         sys.stdout.flush()
 
 
-def calc_zchi2_targets(targets, templates, mp_procs=1, use_gpu=False):
+def calc_zchi2_targets(targets, templates, mp_procs=1, use_gpu=False,new_penalty=False):
     """Compute all chi2 fits for the local set of targets and collect.
 
     Given targets and templates distributed across a set of MPI processes,
@@ -833,6 +833,7 @@ def calc_zchi2_targets(targets, templates, mp_procs=1, use_gpu=False):
         mp_procs (int): if not using MPI, this is the number of multiprocessing
             processes to use.
         gpu (bool): (optional) use gpu for calc_zchi2
+        new_penalty (bool): parameter to switch between penalty versions
 
     Returns:
         dict: dictionary of results for each local target ID.
@@ -916,7 +917,7 @@ def calc_zchi2_targets(targets, templates, mp_procs=1, use_gpu=False):
             while not done:
                 # Compute the fit for our current redshift slice.
                 tzchi2, tzcoeff, tpenalty = \
-                    calc_zchi2(targets.local_target_ids(), targets.local(), t, use_gpu=use_gpu)
+                    calc_zchi2(targets.local_target_ids(), targets.local(), t, use_gpu=use_gpu,new_penalty=new_penalty)
 
                 # Save the results into a dict keyed on targetid
                 tids = targets.local_target_ids()
@@ -967,7 +968,7 @@ def calc_zchi2_targets(targets, templates, mp_procs=1, use_gpu=False):
                 target_ids = mpdist[i]
                 target_data = [ x for x in targets.local() if x.id in mpdist[i] ]
                 p = mp.Process(target=_mp_calc_zchi2,
-                    args=(i, target_ids, target_data, t, use_gpu, qout, qprog))
+                    args=(i, target_ids, target_data, t, use_gpu, qout, qprog,new_penalty))
                 procs.append(p)
                 p.start()
 
